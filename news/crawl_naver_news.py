@@ -1,3 +1,7 @@
+# 네이버 뉴스 크롤링
+# 참고 링크: https://github.com/sbomhoo/naver_news_crawling
+
+
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
 from datetime import datetime
