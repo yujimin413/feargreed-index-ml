@@ -1,6 +1,8 @@
-# cafe_data_250127_2136.csv
+# 
 # 키워드별 수집, content 수집 됨 
 # 페이징 기능 추가함
+# 10 페이지 이상 "다음" 버튼 반영 페이징 성공
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -9,6 +11,20 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import WebDriverException
+
+from selenium.webdriver.chrome.options import Options
+
+options = Options()
+options.add_argument("--headless")
+options.add_argument("--disable-gpu")
+options.add_argument("--no-sandbox")  # 리눅스 환경에서 유용
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--disable-extensions")
+options.add_argument("--disable-logging")
+
+# driver = webdriver.Chrome(options=options)
+
 
 import time
 import pyperclip
@@ -25,7 +41,9 @@ NAVER_PW = os.getenv("NAVER_PW")
 
 # Keywords
 keywords = [
-    "부동산 호황"
+    "집값 상승", "부동산 호황", "매수 타이밍", "재건축 기대", "저금리 효과",
+    "개발 호재", "시장 회복", "신규 분양 열기", "자산 가치 상승", "투자 기회",
+    "강남 아파트 상승", "임대 수익"
 ]
 
 # Function to log in to Naver
@@ -59,7 +77,7 @@ def naver_login(driver, naver_id, naver_pw):
 def crawl_cafe(driver, keywords, start_date, end_date, output_file):
     driver.get("https://cafe.naver.com/jaegebal")
     time.sleep(1)
-    
+
     driver.switch_to.default_content()
     print("[DEBUG] Returned to main content")
     search_bar = driver.find_element(By.ID, "topLayerQueryInput")
@@ -75,115 +93,100 @@ def crawl_cafe(driver, keywords, start_date, end_date, output_file):
             print(f"Searching for keyword: {keyword}")
             driver.switch_to.frame("cafe_main")
             print("[DEBUG] Switched to iframe")
+            
             # "제목만" 클릭
             select_box = driver.find_element(By.ID, "currentSearchByTop")
             select_box.click()
-            # "제목만" 옵션 선택
             title_option = driver.find_element(By.XPATH, "//a[text()='제목만']")
             title_option.click()
+
             # 검색어 입력
             search_input = driver.find_element(By.ID, "queryTop")
-            search_input.clear()  # 입력창 초기화
+            search_input.clear()
             search_input.send_keys(keyword)
-            search_input.send_keys(Keys.RETURN)  # 검색 실행
-            time.sleep(1)  # 검색 결과가 로드될 시간을 확보
+            search_input.send_keys(Keys.RETURN)
+            time.sleep(1)
 
-            while True:  # 페이지 그룹 순회 (예: 1~10, 11~20 등)
-                page_buttons = driver.find_elements(By.CSS_SELECTOR, ".prev-next a:not(.pgR)")  # 페이지 번호 버튼들
-                page_count = len(page_buttons)
-                
-                for page_index in range(page_count):  # 각 페이지 번호 클릭
-                    print(f"[DEBUG] Crawling page {page_index + 1} for keyword: {keyword}")
-                    
-                    # 페이지 버튼 리스트를 다시 찾는다 (DOM 업데이트로 인해 필요)
-                    page_buttons = driver.find_elements(By.CSS_SELECTOR, ".prev-next a:not(.pgR)")
-                    page_buttons[page_index].click()
-                    time.sleep(1)  # 페이지 로드 대기
+            page_number = 1  # 페이지 번호 추적
+            while True:  # 페이지 그룹 순회
+                page_buttons = driver.find_elements(By.CSS_SELECTOR, ".prev-next a:not(.pgR)")  # 현재 페이지 버튼들
+                for button in page_buttons:
+                    # 현재 페이지 번호에 해당하는 버튼 클릭
+                    button_text = button.text.strip()
+                    if button_text.isdigit() and int(button_text) == page_number:
+                        print(f"[DEBUG] Clicking page {page_number} for keyword: {keyword}")
+                        button.click()
+                        time.sleep(1)
+                        break
 
-                    rows = driver.find_elements(By.CSS_SELECTOR, "#main-area > div:nth-child(5) > table > tbody > tr")  # 모든 행 선택
-                    print(f"[DEBUG] Found {len(rows)} rows")
+                rows = driver.find_elements(By.CSS_SELECTOR, "#main-area > div:nth-child(5) > table > tbody > tr")
+                print(f"[DEBUG] Found {len(rows)} rows on page {page_number}")
 
-                    for row_index in range(len(rows)):
+                for row_index in range(len(rows)):
+                    try:
+                        row = rows[row_index]
+                        title_element = row.find_element(By.CSS_SELECTOR, "td.td_article .article")
+                        title = title_element.text
+                        print(f"[DEBUG] Title: {title}")
+                        link = title_element.get_attribute("href")
+                        author = row.find_element(By.CSS_SELECTOR, "td.td_name .m-tcol-c").text
+                        date = row.find_element(By.CSS_SELECTOR, "td.td_date").text
+                        if date < start_date or date > end_date:
+                            continue
+                        views = row.find_element(By.CSS_SELECTOR, "td.td_view").text
+
+                        # 게시글 클릭 및 내용 수집
+                        title_element.click()
+                        time.sleep(1)
+
+                        driver.switch_to.default_content()
+                        driver.switch_to.frame("cafe_main")
+                        
                         try:
-                            rows = driver.find_elements(By.CSS_SELECTOR, "#main-area > div:nth-child(5) > table > tbody > tr")
-                            row = rows[row_index]
-
-                            title_element = row.find_element(By.CSS_SELECTOR, "td.td_article .article")
-                            title = title_element.text
-                            print(f"[DEBUG] Title: {title}")
-                            link = title_element.get_attribute("href")
-                            author = row.find_element(By.CSS_SELECTOR, "td.td_name .m-tcol-c").text
-                            date = row.find_element(By.CSS_SELECTOR, "td.td_date").text
-                            if date < start_date or date > end_date:
-                                print(f"[DEBUG] Date out of range: {date}")
-                                continue
-                            views = row.find_element(By.CSS_SELECTOR, "td.td_view").text
-
-                            # 게시글 클릭 및 내용 수집
-                            title_element.click()
-                            time.sleep(1)
-
-                            driver.switch_to.default_content()
-                            driver.switch_to.frame("cafe_main")
-                            
+                            content_element = driver.find_element(By.CLASS_NAME, "se-main-container")
+                            content = content_element.text
+                        except NoSuchElementException:
                             try:
-                                content_element = driver.find_element(By.CLASS_NAME, "se-main-container")
+                                content_element = driver.find_element(By.CLASS_NAME, "txt")
                                 content = content_element.text
-                                print("[DEBUG] Content found")
-                                print(f"{content}")
-                                print("-" * 50)
                             except NoSuchElementException:
-                                try: 
-                                    #app > div > div > div.ArticleContentBox > div.article_container
-                                    content_element = driver.find_element(By.CLASS_NAME, "txt")
+                                try:
+                                    content_element = driver.find_element(By.CLASS_NAME, "scrap_added")
                                     content = content_element.text
-                                    print("[DEBUG] Outer Link found")
-                                    print(f"{content}")
-                                    print("-" * 50)
                                 except NoSuchElementException:
                                     try:
-                                        content_element = driver.find_element(By.CLASS_NAME, "scrap_added")
+                                        content_element = driver.find_element(By.CLASS_NAME, "se-component-content")
                                         content = content_element.text
-                                        print("[DEBUG] Scrap found")
-                                        print(f"{content}")
-                                        print("-" * 50)
                                     except NoSuchElementException:
-                                        try:
-                                            content_element = driver.find_element(By.CLASS_NAME, "se-component-content")
-                                            content = content_element.text
-                                            print("[DEBUG] se-component-content found")
-                                            print(f"{content}")
-                                            print("-" * 50)
-                                        except NoSuchElementException:
-                                            content = "Content not found"
-                                            print("[ERROR] Content not found")
-                            
-                            driver.back()
-                            time.sleep(1)
-                            driver.switch_to.frame("cafe_main")
+                                        content = "Content not found"
 
-                            # # 날짜 필터링 및 데이터 저장
-                            # if start_date <= date <= end_date:
-                            #     data.append([keyword, date, title, content, link, author, views])
-                            
-                            
-                            data.append([keyword, date, title, content, link, author, views])
+                        driver.back()
+                        time.sleep(1)
+                        driver.switch_to.frame("cafe_main")
+                        data.append([keyword, date, title, content, link, author, views])
 
-                        except Exception as e:
-                            print(f"[DEBUG] Error processing row {row_index + 1}: {e}")
+                    except Exception as e:
+                        print(f"[DEBUG] Error processing row {row_index + 1}: {e}")
 
-                # "다음" 버튼 클릭 (페이지 그룹 이동)
-                try:
-                    next_button = driver.find_element(By.CSS_SELECTOR, ".prev-next a.pgR")
-                    next_button.click()
-                    time.sleep(1)
-                except NoSuchElementException:
-                    print(f"No more pages for keyword: {keyword}")
-                    break  # 다음 키워드로 넘어감
+                page_number += 1  # 페이지 번호 증가
+
+                # 다음 페이지 그룹으로 이동
+                if page_number % 10 == 1:
+                    print(f"[DEBUG] Moving to next page group after page {page_number - 1}")
+                    try:
+                        next_button = driver.find_element(By.CSS_SELECTOR, ".prev-next a.pgR")
+                        next_button.click()
+                        time.sleep(2)  # 페이지 그룹 로드 대기
+                    except NoSuchElementException:
+                        print(f"No more pages for keyword: {keyword}")
+                        break  # 다음 키워드로 이동
+                else:
+                    # 현재 페이지에서 다음 페이지를 클릭하도록 루프 유지
+                    continue
 
         except NoSuchElementException as e:
             print(f"Error switching to iframe or finding rows: {e}")
-        
+
         driver.switch_to.default_content()
 
     # Save to CSV
@@ -192,6 +195,15 @@ def crawl_cafe(driver, keywords, start_date, end_date, output_file):
         writer.writerow(["Keyword", "Date", "Title", "Content", "Link", "Author", "Views"])
         writer.writerows(data)
     print(f"Data saved to {output_file}")
+
+
+    # Save to CSV
+    with open(output_file, mode="w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Keyword", "Date", "Title", "Content", "Link", "Author", "Views"])
+        writer.writerows(data)
+    print(f"Data saved to {output_file}")
+
 
     
 
@@ -207,9 +219,23 @@ if __name__ == "__main__":
 
     # Initialize WebDriver
     driver = webdriver.Chrome()  # Ensure chromedriver is in your PATH
+    # driver = webdriver.Chrome(options=options)
 
     try:
         naver_login(driver, NAVER_ID, NAVER_PW)
-        crawl_cafe(driver, keywords, start_date, end_date, output_file)
+        # crawl_cafe(driver, keywords, start_date, end_date, output_file)
+        
+
+        try:
+            # 웹 크롤링 수행
+            crawl_cafe(driver, keywords, start_date, end_date, output_file)
+        except WebDriverException as e:
+            print(f"[ERROR] WebDriverException occurred: {e}")
+            print("[INFO] Restarting the browser...")
+            driver.quit()
+            driver = webdriver.Chrome(options=options)  # 브라우저 재시작
+            naver_login(driver, NAVER_ID, NAVER_PW)
+            crawl_cafe(driver, keywords, start_date, end_date, output_file)  # 남은 작업 재시작
+
     finally:
         driver.quit()
