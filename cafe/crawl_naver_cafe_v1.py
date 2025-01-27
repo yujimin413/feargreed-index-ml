@@ -56,3 +56,6 @@ finally:
     # Optionally close the browser
     # driver.quit()
     pass
+
+driver.get("https://cafe.naver.com/jaegebal")
+time.sleep(10)

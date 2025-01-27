@@ -1,6 +1,8 @@
 # 네이버 뉴스 크롤링
 # 참고 링크: https://github.com/sbomhoo/naver_news_crawling
 
+# 사용법: keywords 리스트에 크롤링할 키워드 추가, 파일명 설정 후 실행
+
 
 # -*- coding: utf-8 -*-
 from bs4 import BeautifulSoup
