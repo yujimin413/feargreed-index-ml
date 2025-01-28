@@ -169,4 +169,25 @@ def crawl_cafe(driver, keywords, start_date, end_date, output_file):
     # Save to CSV
     with open(output_file, mode="w", encoding="utf-8-sig", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["Keyword", "Date", "Title", "Content", "Link", "Author", "Views
+        writer.writerow(["Keyword", "Date", "Title", "Content", "Link", "Author", "Views"])
+        writer.writerows(data)
+    print(f"Data saved to {output_file}")
+
+# Main script
+if __name__ == "__main__":
+    # User-defined parameters
+    start_date = input("Enter start date (YYYY.MM.DD): ")
+    end_date = input("Enter end date (YYYY.MM.DD): ")
+
+    timestamp = datetime.now().strftime("%y%m%d_%H%M")
+    # output_file = "cafe_data.csv"
+    output_file = f"cafe_data_{timestamp}.csv"
+
+    # Initialize WebDriver
+    driver = webdriver.Chrome()  # Ensure chromedriver is in your PATH
+
+    try:
+        naver_login(driver, NAVER_ID, NAVER_PW)
+        crawl_cafe(driver, keywords, start_date, end_date, output_file)
+    finally:
+        driver.quit()

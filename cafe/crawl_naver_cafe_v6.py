@@ -40,10 +40,16 @@ NAVER_ID = os.getenv("NAVER_ID")
 NAVER_PW = os.getenv("NAVER_PW")
 
 # Keywords
+# keywords = [
+#     "부동산 호황", "매수 타이밍", "재건축 기대", "저금리 효과",
+#     "개발 호재", "시장 회복", "신규 분양 열기", "자산 가치 상승", "투자 기회",
+#     "강남 아파트 상승", "임대 수익"
+# ]
 keywords = [
-    "집값 상승", "부동산 호황", "매수 타이밍", "재건축 기대", "저금리 효과",
-    "개발 호재", "시장 회복", "신규 분양 열기", "자산 가치 상승", "투자 기회",
-    "강남 아파트 상승", "임대 수익"
+    "집값 폭락", "부동산 거품", "금리 인상", "대출 규제", "거래 절벽",
+    "전세난", "주택 매매 침체", "부동산 하락", "경제 위기", "디폴트 위기",
+    "경기 침체", "대출 상환 부담", "경매 급증", "시장 불안", "매물 증가",
+    "재산세 부담", "공급 과잉"
 ]
 
 # Function to log in to Naver
@@ -124,7 +130,11 @@ def crawl_cafe(driver, keywords, start_date, end_date, output_file):
 
                 for row_index in range(len(rows)):
                     try:
+                        print(f"[DEBUG] Processing row {row_index + 1}")
+
+                        rows = driver.find_elements(By.CSS_SELECTOR, "#main-area > div:nth-child(5) > table > tbody > tr")  # 모든 행 선택  
                         row = rows[row_index]
+                        
                         title_element = row.find_element(By.CSS_SELECTOR, "td.td_article .article")
                         title = title_element.text
                         print(f"[DEBUG] Title: {title}")
@@ -215,11 +225,11 @@ if __name__ == "__main__":
 
     timestamp = datetime.now().strftime("%y%m%d_%H%M")
     # output_file = "cafe_data.csv"
-    output_file = f"cafe_data_{timestamp}.csv"
+    output_file = f"cafe_data_공포{timestamp}.csv"
 
     # Initialize WebDriver
-    driver = webdriver.Chrome()  # Ensure chromedriver is in your PATH
-    # driver = webdriver.Chrome(options=options)
+    # driver = webdriver.Chrome()  # Ensure chromedriver is in your PATH
+    driver = webdriver.Chrome(options=options)
 
     try:
         naver_login(driver, NAVER_ID, NAVER_PW)
@@ -232,10 +242,4 @@ if __name__ == "__main__":
         except WebDriverException as e:
             print(f"[ERROR] WebDriverException occurred: {e}")
             print("[INFO] Restarting the browser...")
-            driver.quit()
-            driver = webdriver.Chrome(options=options)  # 브라우저 재시작
-            naver_login(driver, NAVER_ID, NAVER_PW)
-            crawl_cafe(driver, keywords, start_date, end_date, output_file)  # 남은 작업 재시작
-
-    finally:
-        driver.quit()
+            driver.qui
